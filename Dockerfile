@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this file.  If not, see <http://www.gnu.org/licenses/>.
 #
-FROM ubuntu:16.04
+FROM ubuntu:22.04 AS base
 ARG DEBIAN_FRONTEND="noninteractive"
 ENV TERM="xterm" LANG="C.UTF-8" LC_ALL="C.UTF-8"
 RUN apt-get update && \
@@ -33,30 +33,32 @@ RUN apt-get update && \
       libsdl1.2-dev \
       libtool-bin \
       python3 \
-      vim && \
+      vim
+
+RUN apt-get install -y libswscale-dev
+
+FROM base AS comskip
 #
 # Clone comskip
-    cd /opt && \
-    git clone git://github.com/erikkaashoek/Comskip comskip && \
-    cd comskip && \
-    ./autogen.sh && \
-    ./configure && \
-    make && \
+WORKDIR /opt
+RUN git clone --depth=1 https://github.com/erikkaashoek/Comskip comskip
+WORKDIR /opt/comskip
+RUN ./autogen.sh
+RUN ./configure
+RUN make -j$(nproc)
+
+FROM comskip as comchap
 #
 # Clone comchap/comcut
-    cd /opt && \
-    git clone https://github.com/mgafner/comchap.git && \
+WORKDIR /opt
+RUN git clone --depth=1 https://github.com/BrettSheleski/comchap.git
+
+FROM comchap as system
 #
 # link commands to user bin
-    ln -s /opt/comskip/comskip /usr/bin/comskip && \
-    ln -s /opt/comchap/comchap /usr/bin/comchap && \
-    ln -s /opt/comchap/comcut /usr/bin/comcut && \
-#
-# Cleanup
-    apt-get -y autoremove && \
-    apt-get -y clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -rf /tmp/* && \
-    rm -rf /var/tmp/*
-#
-ADD ./config/comskip.ini /root/.comskip.ini
+RUN ln -s /opt/comskip/comskip /usr/bin/comskip
+RUN ln -s /opt/comchap/comchap /usr/bin/comchap
+RUN ln -s /opt/comchap/comcut /usr/bin/comcut
+
+WORKDIR /root
+ADD ./comskip.ini .comskip.ini
